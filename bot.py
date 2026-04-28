@@ -45,12 +45,10 @@ DAYS_RU = {
 }
 
 def get_day_ru(date_obj):
-    """Получить день недели на русском"""
     day_en = date_obj.strftime("%A")
     return DAYS_RU.get(day_en, day_en)
 
 def format_duration(duration_minutes):
-    """Форматирование длительности"""
     hours = duration_minutes // 60
     minutes = duration_minutes % 60
     if hours > 0 and minutes > 0:
@@ -59,6 +57,13 @@ def format_duration(duration_minutes):
         return f"{hours} ч"
     else:
         return f"{minutes} мин"
+
+def get_service_by_id(service_id):
+    """Получить название услуги и длительность по короткому ID"""
+    for i, (service_name, duration) in enumerate(SERVICES.items()):
+        if f"s{i}" == service_id:
+            return service_name, duration
+    return list(SERVICES.keys())[0], list(SERVICES.values())[0]
 
 # ==================== ИНИЦИАЛИЗАЦИЯ БОТА ====================
 bot = telebot.TeleBot(TOKEN, parse_mode="Markdown")
@@ -74,7 +79,6 @@ user_booking_data = {}
 # ==================== РАБОТА С ПОЛЬЗОВАТЕЛЯМИ ====================
 
 def save_user(user_id, username, first_name):
-    """Сохранить пользователя в базу"""
     users = load_users()
     if str(user_id) not in users:
         users[str(user_id)] = {
@@ -86,7 +90,6 @@ def save_user(user_id, username, first_name):
         save_users(users)
 
 def load_users():
-    """Загрузка списка пользователей"""
     if not os.path.exists(USERS_FILE):
         return {}
     try:
@@ -99,7 +102,6 @@ def load_users():
         return {}
 
 def save_users(data):
-    """Сохранение списка пользователей"""
     try:
         temp_file = USERS_FILE + ".tmp"
         with open(temp_file, 'w', encoding='utf-8') as f:
@@ -111,14 +113,11 @@ def save_users(data):
         print(f"Ошибка сохранения пользователей: {e}")
 
 def get_all_users():
-    """Получить всех пользователей"""
-    users = load_users()
-    return list(users.values())
+    return list(load_users().values())
 
 # ==================== РАБОТА С ФАЙЛАМИ ЗАПИСЕЙ ====================
 
 def load_appointments():
-    """Загрузка записей из файла"""
     if not os.path.exists(APPOINTMENTS_FILE):
         return {}
     try:
@@ -130,17 +129,9 @@ def load_appointments():
             return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, PermissionError) as e:
         print(f"⚠️ Ошибка чтения файла: {e}")
-        if os.path.exists(APPOINTMENTS_FILE):
-            backup_name = f"{APPOINTMENTS_FILE}.backup"
-            try:
-                os.rename(APPOINTMENTS_FILE, backup_name)
-                print(f"📁 Создана резервная копия: {backup_name}")
-            except:
-                pass
         return {}
 
 def save_appointments(data):
-    """Сохранение записей в файл"""
     try:
         temp_file = APPOINTMENTS_FILE + ".tmp"
         with open(temp_file, 'w', encoding='utf-8') as f:
@@ -148,27 +139,15 @@ def save_appointments(data):
         if os.path.exists(APPOINTMENTS_FILE):
             os.remove(APPOINTMENTS_FILE)
         os.rename(temp_file, APPOINTMENTS_FILE)
-    except PermissionError as e:
-        print(f"❌ Ошибка сохранения: {e}")
-        alt_file = os.path.join(DATA_DIR, "appointments_backup.json")
-        try:
-            with open(alt_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            print(f"✅ Данные сохранены в {alt_file}")
-        except:
-            print("❌ Не удалось сохранить данные")
     except Exception as e:
-        print(f"❌ Неожиданная ошибка сохранения: {e}")
+        print(f"❌ Ошибка сохранения: {e}")
 
 # ==================== РАБОТА С ЗАПИСЯМИ ====================
 
 def get_appointments_for_date(date_str):
-    """Получить записи на конкретную дату"""
-    appointments = load_appointments()
-    return appointments.get(date_str, {})
+    return load_appointments().get(date_str, {})
 
 def add_appointment(date_str, time_str, user_id, username, client_name, client_phone, service_name="", duration=60):
-    """Добавить запись с данными клиента и услугой"""
     appointments = load_appointments()
     if date_str not in appointments:
         appointments[date_str] = {}
@@ -191,7 +170,6 @@ def add_appointment(date_str, time_str, user_id, username, client_name, client_p
     save_appointments(appointments)
 
 def cancel_appointment(user_id):
-    """Отменить запись пользователя"""
     appointments = load_appointments()
     for date_str, times in list(appointments.items()):
         for time_str, data in list(times.items()):
@@ -204,7 +182,6 @@ def cancel_appointment(user_id):
     return None, None, None
 
 def cancel_appointment_admin(date_str, time_str):
-    """Отменить запись админом"""
     appointments = load_appointments()
     if date_str in appointments and time_str in appointments[date_str]:
         data = appointments[date_str][time_str]
@@ -216,7 +193,6 @@ def cancel_appointment_admin(date_str, time_str):
     return None
 
 def get_user_appointment(user_id):
-    """Получить запись пользователя"""
     appointments = load_appointments()
     for date_str, times in appointments.items():
         for time_str, data in times.items():
@@ -225,7 +201,6 @@ def get_user_appointment(user_id):
     return None, None, None
 
 def get_all_appointments():
-    """Получить все записи"""
     appointments = load_appointments()
     result = []
     for date_str in sorted(appointments.keys()):
@@ -246,7 +221,6 @@ def get_all_appointments():
 # ==================== ГЕНЕРАЦИЯ СЛОТОВ ====================
 
 def get_available_slots(date_str, duration_minutes=60):
-    """Получить доступные слоты на дату с учётом длительности услуги"""
     try:
         datetime.strptime(date_str, "%d.%m.%Y")
         all_slots = []
@@ -279,8 +253,7 @@ def get_available_slots(date_str, duration_minutes=60):
                 if slot_start < booked_end and slot_end > booked_start:
                     busy_slots.add(slot)
                     break
-        available = [s for s in valid_slots if s not in busy_slots]
-        return available
+        return [s for s in valid_slots if s not in busy_slots]
     except:
         return []
 
@@ -356,8 +329,8 @@ def create_calendar(year, month):
                     row.append(InlineKeyboardButton(" · ", callback_data="cal_ignore"))
                 else:
                     has_slots = False
-                    for duration in SERVICES.values():
-                        if get_available_slots(date_str, duration):
+                    for dur in SERVICES.values():
+                        if get_available_slots(date_str, dur):
                             has_slots = True
                             break
                     if has_slots:
@@ -370,8 +343,12 @@ def create_calendar(year, month):
 
 def create_service_keyboard(date_str):
     markup = InlineKeyboardMarkup(row_width=1)
-    for service_name, duration in SERVICES.items():
-        markup.add(InlineKeyboardButton(f"{service_name} ({format_duration(duration)})", callback_data=f"service_{date_str}_{service_name}"))
+    for i, (service_name, duration) in enumerate(SERVICES.items()):
+        service_id = f"s{i}"
+        markup.add(InlineKeyboardButton(
+            f"{service_name} ({format_duration(duration)})",
+            callback_data=f"svc_{date_str}_{service_id}"
+        ))
     markup.add(InlineKeyboardButton("🔙 К календарю", callback_data="cal_back"))
     markup.add(InlineKeyboardButton("🏠 В главное меню", callback_data="cal_main_menu"))
     return markup
@@ -387,7 +364,7 @@ def create_time_slots_keyboard(date_str, duration_minutes=60):
             for slot in available_slots[i:i+3]:
                 row.append(InlineKeyboardButton(f"🕐 {slot}", callback_data=f"slot_{date_str}_{slot}"))
             markup.add(*row)
-    markup.add(InlineKeyboardButton("🔙 К выбору услуги", callback_data=f"service_back_{date_str}"))
+    markup.add(InlineKeyboardButton("🔙 К выбору услуги", callback_data=f"svc_back_{date_str}"))
     markup.add(InlineKeyboardButton("🏠 В главное меню", callback_data="cal_main_menu"))
     return markup
 
@@ -548,20 +525,20 @@ def calendar_day_selected(call):
     date_obj = datetime.strptime(date_str, "%d.%m.%Y")
     bot.edit_message_text(f"📅 *{date_str}* ({get_day_ru(date_obj)})\n\n💅 *Выберите услугу:*", call.message.chat.id, call.message.message_id, reply_markup=create_service_keyboard(date_str), parse_mode="Markdown")
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("service_") and not call.data.startswith("service_back_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("svc_"))
 def service_selected(call):
     parts = call.data.split("_", 2)
     date_str = parts[1]
-    service_name = parts[2]
-    duration = SERVICES.get(service_name, 60)
+    service_id = parts[2]
+    service_name, duration = get_service_by_id(service_id)
     user_booking_data[call.from_user.id] = {'date': date_str, 'service': service_name, 'duration': duration}
     available_slots = get_available_slots(date_str, duration)
     date_obj = datetime.strptime(date_str, "%d.%m.%Y")
     bot.edit_message_text(f"📅 *{date_str}* ({get_day_ru(date_obj)})\n💅 *{service_name}* ({format_duration(duration)})\n\n🕐 *Выберите время:*\nДоступно слотов: {len(available_slots)}", call.message.chat.id, call.message.message_id, reply_markup=create_time_slots_keyboard(date_str, duration), parse_mode="Markdown")
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("service_back_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("svc_back_"))
 def service_back(call):
-    date_str = call.data.replace("service_back_", "")
+    date_str = call.data.replace("svc_back_", "")
     date_obj = datetime.strptime(date_str, "%d.%m.%Y")
     bot.edit_message_text(f"📅 *{date_str}* ({get_day_ru(date_obj)})\n\n💅 *Выберите услугу:*", call.message.chat.id, call.message.message_id, reply_markup=create_service_keyboard(date_str), parse_mode="Markdown")
 
@@ -764,9 +741,9 @@ def admin_cancel_appointment(call):
         except:
             pass
         bot.answer_callback_query(call.id, f"✅ Запись отменена")
-        admin_day_selected(call)
     else:
         bot.answer_callback_query(call.id, "❌ Запись не существует")
+    admin_day_selected(call)
 
 @bot.callback_query_handler(func=lambda call: call.data == "admin_back_to_calendar")
 def admin_back_to_calendar(call):
@@ -913,7 +890,6 @@ def cleanup_old_appointments():
                 app_datetime = datetime.strptime(f"{date_str} {time_str}", "%d.%m.%Y %H:%M")
                 data = appointments[date_str][time_str]
                 duration = data.get('duration', 60)
-                # Удаляем через 20 минут после ОКОНЧАНИЯ услуги
                 if now > app_datetime + timedelta(minutes=duration + 20):
                     print(f"🗑 Автоудаление: {date_str} {time_str} - {data.get('client_name', '?')}")
                     del appointments[date_str][time_str]
